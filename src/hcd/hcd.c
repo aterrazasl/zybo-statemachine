@@ -25,6 +25,7 @@ static hcd_endpoint0 ep0;
 
 static void hcd_HostIntrHandler(void *HandlerRef);
 static void hcd_UsbHostIntrHandler(void *CallBackRef, u32 Mask);
+static SM_return hcd_sm_disconnected(hcd_params *pvParameters, void * event);
 
 hcd_endpoint0* hcd_getEp0(){
 	hcd_endpoint0 *ep0Ptr = &ep0;
@@ -65,9 +66,9 @@ static void hcd_setQueueBusy(u8 busy){
 	hcd.busy = busy;
 }
 
-static u8 hcd_checkBusy(void){
-	return hcd.busy;
-}
+//static u8 hcd_checkBusy(void){
+//	return hcd.busy;
+//}
 
 static void hcd_enablePeriodicList(hcd_t *hcdPtr){
 	hcd_setQueueBusy(BUSY);
@@ -895,24 +896,9 @@ static void hcd_HostIntrHandler(void *HandlerRef)
 		(hcdPtr->HandlerFunc)(hcdPtr->HandlerRef, IrqSts);
 	}
 
-//	if(hcdPtr->deviceConnected == 1){
-//		hcd_enumerationStateMachine(hcdPtr);
-//	}
-
-
-/*class specific interrupt handler
- *
- */
-//	if(hcdPtr->state == hcd_idle){
-//		if ((IrqSts & hcdPtr->ClassHandlerMask) && hcdPtr->ClassHandlerFunc) {
-//			(hcdPtr->ClassHandlerFunc)(hcdPtr->ClassHandlerRef, IrqSts);
-//		}
-//	}
-
 	portEND_SWITCHING_ISR(pvParameters->xHigherPriorityTaskWoken);
 
 	hcd_clearLED(2);
-
 }
 
 static void hcd_UsbHostIntrHandler(void *CallBackRef, u32 Mask)
@@ -952,16 +938,16 @@ static void hcd_UsbHostIntrHandler(void *CallBackRef, u32 Mask)
 			}
 			hcdPtr->speedDetected = (portStatus >> 26) & 0x03;
 
-				event = hcd_event_powered;
-				xQueueSendFromISR(pvParameters->statemachine.stateQueue, &event,
-						&pvParameters->xHigherPriorityTaskWoken);
+			event = hcd_event_powered;
+			xQueueSendFromISR(pvParameters->statemachine.stateQueue, &event,
+					&pvParameters->xHigherPriorityTaskWoken);
 		} else {
-//			hcdPtr->deviceConnected = 0;
-//			hcdPtr->speedDetected = (portStatus >> 26) & 0x03;
-//			hcdPtr->state = hcd_disconnected;
-//			event = hcd_event_disconnected;
-//			xQueueSendFromISR(pvParameters->statemachine.stateQueue, &event,
-//					&pvParameters->xHigherPriorityTaskWoken);
+			hcdPtr->deviceConnected = 0;
+			hcdPtr->speedDetected = (portStatus >> 26) & 0x03;
+			hcdPtr->state = hcd_disconnected;
+			event = hcd_event_disconnected;
+			xQueueSendFromISR(pvParameters->statemachine.stateQueue, &event,
+					&pvParameters->xHigherPriorityTaskWoken);
 		}
 	}
 
@@ -1051,6 +1037,10 @@ static SM_return hcd_sm_idle(hcd_params *pvParameters, void * event) {
 		hcd_enqueNextPeriodicQH(hcdPtr);
 		ret = state_handled;
 		break;
+	case hcd_event_disconnected:
+		nextState((void*)pvParameters, (void*)hcd_sm_disconnected);
+		ret = state_transition;
+		break;
 	case hcd_event_exit:
 		ret = state_handled;
 		break;
@@ -1076,6 +1066,10 @@ static SM_return hcd_sm_configured(hcd_params *pvParameters, void * event) {
 	case hcd_event_asyncComplete:
 		hcd_printEP0();
 		nextState((void*)pvParameters, (void*)hcd_sm_idle);
+		ret = state_transition;
+		break;
+	case hcd_event_disconnected:
+		nextState((void*)pvParameters, (void*)hcd_sm_disconnected);
 		ret = state_transition;
 		break;
 	case hcd_event_exit:
@@ -1106,6 +1100,10 @@ static SM_return hcd_sm_default(hcd_params *pvParameters, void * event) {
 		nextState((void*)pvParameters, (void*)hcd_sm_configured);
 		ret = state_transition;
 		break;
+	case hcd_event_disconnected:
+		nextState((void*)pvParameters, (void*)hcd_sm_disconnected);
+		ret = state_transition;
+		break;
 	case hcd_event_exit:
 		ret = state_handled;
 		break;
@@ -1132,6 +1130,10 @@ static SM_return hcd_sm_getConfigurationFull(hcd_params *pvParameters, void * ev
 		nextState((void*)pvParameters, (void*)hcd_sm_default);
 		ret = state_transition;
 		break;
+	case hcd_event_disconnected:
+		nextState((void*)pvParameters, (void*)hcd_sm_disconnected);
+		ret = state_transition;
+		break;
 	case hcd_event_exit:
 		ret = state_handled;
 		break;
@@ -1142,7 +1144,6 @@ static SM_return hcd_sm_getConfigurationFull(hcd_params *pvParameters, void * ev
 	hcd_printEvent(*e);
 	return ret;
 }
-
 
 static SM_return hcd_sm_getConfiguration(hcd_params *pvParameters, void * event) {
 
@@ -1157,6 +1158,10 @@ static SM_return hcd_sm_getConfiguration(hcd_params *pvParameters, void * event)
 	case hcd_event_asyncComplete:
 		hcd_parseConfigurationDescriptor(hcdPtr);
 		nextState((void*)pvParameters, (void*)hcd_sm_getConfigurationFull);
+		ret = state_transition;
+		break;
+	case hcd_event_disconnected:
+		nextState((void*)pvParameters, (void*)hcd_sm_disconnected);
 		ret = state_transition;
 		break;
 	case hcd_event_exit:
@@ -1186,6 +1191,10 @@ static SM_return hcd_sm_getDeviceDescriptorFull(hcd_params *pvParameters, void *
 		nextState((void*)pvParameters, (void*)hcd_sm_getConfiguration);
 		ret = state_transition;
 		break;
+	case hcd_event_disconnected:
+		nextState((void*)pvParameters, (void*)hcd_sm_disconnected);
+		ret = state_transition;
+		break;
 	case hcd_event_exit:
 		ret = state_handled;
 		break;
@@ -1209,6 +1218,10 @@ static SM_return hcd_sm_setAddress(hcd_params *pvParameters, void * event) {
 		break;
 	case hcd_event_asyncComplete:
 		nextState((void*)pvParameters, (void*)hcd_sm_getDeviceDescriptorFull);
+		ret = state_transition;
+		break;
+	case hcd_event_disconnected:
+		nextState((void*)pvParameters, (void*)hcd_sm_disconnected);
 		ret = state_transition;
 		break;
 	case hcd_event_exit:
@@ -1236,6 +1249,10 @@ static SM_return hcd_sm_reset(hcd_params *pvParameters, void * event) {
 		nextState((void*)pvParameters, (void*)hcd_sm_setAddress);
 		ret = state_transition;
 		break;
+	case hcd_event_disconnected:
+		nextState((void*)pvParameters, (void*)hcd_sm_disconnected);
+		ret = state_transition;
+		break;
 	case hcd_event_exit:
 		ret = state_handled;
 		break;
@@ -1260,6 +1277,10 @@ static SM_return hcd_sm_getDeviceDescriptor(hcd_params *pvParameters, void * eve
 	case hcd_event_asyncComplete:
 		hcd_parseDeviceDescriptor(hcdPtr);
 		nextState((void*)pvParameters, (void*)hcd_sm_reset);
+		ret = state_transition;
+		break;
+	case hcd_event_disconnected:
+		nextState((void*)pvParameters, (void*)hcd_sm_disconnected);
 		ret = state_transition;
 		break;
 	case hcd_event_exit:
@@ -1289,6 +1310,10 @@ static SM_return hcd_sm_powered(hcd_params *pvParameters, void * event) {
 		nextState((void*)pvParameters, (void*)hcd_sm_getDeviceDescriptor);
 		ret = state_transition;
 		break;
+	case hcd_event_disconnected:
+		nextState((void*)pvParameters, (void*)hcd_sm_disconnected);
+		ret = state_transition;
+		break;
 	case hcd_event_exit:
 		ret = state_handled;
 		break;
@@ -1304,15 +1329,15 @@ static SM_return hcd_sm_disconnected(hcd_params *pvParameters, void * event) {
 
 	hcd_events *e = (hcd_events*) event;
 	SM_return ret = state_handled;
-	hcd_t * hcdPtr = pvParameters->hcdPtr;
 	switch (*e) {
 	case hcd_event_enter:
-//		hcd_resetPort(hcdPtr);
 		ret = state_handled;
+		xil_printf("%s","Waiting for USB device connection\r\n");
 		break;
 	case hcd_event_powered:
 		nextState((void*)pvParameters, (void*)hcd_sm_powered);
 		ret = state_transition;
+		xil_printf("%s","USB device detected\r\n");
 		break;
 	case hcd_event_exit:
 		ret = state_handled;
