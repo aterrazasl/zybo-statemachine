@@ -3,9 +3,9 @@
 #include "hcd_usbCh9.h"
 
 
-static hcd_endpoint0  ep1;
-static hcd_endpoint0* hid_createGetReportRequest(void);
+static void hid_createGetReportRequest(hcd_t *hcdPtr);
 
+static hcd_endpoint0  ep1;
 static char hid_data[8];
 
 void hid_printLine(u8* data, u32 size, char* comment){
@@ -17,7 +17,6 @@ void hid_printLine(u8* data, u32 size, char* comment){
 }
 
 static u8 evaluateDiff(u8* new){
-//	static u8 old[8];
 	int i;
 	for(i =0;i<8;i++){
 		if(hid_data[i]!= new[i]){
@@ -37,17 +36,11 @@ void hid_callbackHandler(void *CallBackRef, u32 Mask){
 		hid_printLine((u8*)(hcdPtr->periodicqTD[1]->buffer[0]&0xfffff000), 0x0008, "Keyboard Report");
 		memcpy((void*)hid_data, (void*)(hcdPtr->periodicqTD[1]->buffer[0]&0xfffff000) , 8);
 	}
-
-
-//	hcdPtr->periodicQH[0]->overlay.buffer[0]&= 0xfffff000;
-//	hcd_enqueNextPeriodicQH(hcdPtr);
-
-//	hcd_enquePeriodicQH(hcdPtr,hid_createGetReportRequest());
 }
 
-static hcd_endpoint0* hid_createGetReportRequest(void){
+static void hid_createGetReportRequest(hcd_t *hcdPtr){
 
-	hcd_endpoint0 *epPtr = &ep1;
+	hcd_endpoint0 *epPtr = hcdPtr->ep1;
 
 	epPtr->setupData.bmRequestType = DEVICE_TO_HOST | CLASS_TYPE | INTERFACE_RECIPIENT;
 	epPtr->setupData.bRequest 		= GET_REPORT;
@@ -55,18 +48,16 @@ static hcd_endpoint0* hid_createGetReportRequest(void){
 	epPtr->setupData.wIndex 		= hcd_swap_uint16(0x0000);
 	epPtr->setupData.wLength 		= 0x0008;
 
-
 	epPtr->address = 1;
 	epPtr->maxPacketSize = 64;
 	epPtr->expectReply = 1;
 
-//	Xil_DCacheFlush();
-	Xil_DCacheFlushRange((INTPTR)epPtr, sizeof(epPtr));
-
-	return epPtr;
+	return;
 }
 
 void hid_requestReport(hcd_t *hcdPtr){
-	hcd_enquePeriodicQH(hcdPtr,hid_createGetReportRequest());
-//	hcd_sendSetupData(hcdPtr,hid_createGetReportRequest());
+	hcdPtr->ep1 = &ep1;
+	hid_createGetReportRequest(hcdPtr);
+	hcd_enquePeriodicQH(hcdPtr);
+
 }

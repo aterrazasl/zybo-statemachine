@@ -15,15 +15,9 @@ extern "C" {
 #include "../sm/statemachine.h"
 
 
-
-
-
 /* Definitions */
 
-#define VERBOSE 1
-#define BUSY 1
-#define NOT_BUSY 0
-
+#define HCD_DISABLE_CACHE 0	//1 Sets the memory table attributes to disable the cache, 0 flushes the memory when needed
 
 #define HCD_NUM_BUFFER_PTR 1
 #define HCD_MAX_QTD	4
@@ -31,10 +25,8 @@ extern "C" {
 #define HCD_MAX_PERIODIC_QH 2
 #define HCD_MAX_PERIODIC_QTD 2
 
-
-
 #define ALIGNMENT_CACHELINE  __attribute__ ((aligned (32)))
-#define MEMORY_SIZE (((HCD_NUM_BUFFER_PTR * 4096)*HCD_MAX_QTD) + (HCD_MAX_QTD * HCD_dTD_ALIGN) + (HCD_MAX_QH * HCD_dQH_ALIGN) +4096) //  + (HCD_MAX_QH * HCD_dQH_ALIGN)) + ((HCD_NUM_BUFFER_PTR * 4096) + (HCD_MAX_PERIODIC_QTD * HCD_dTD_ALIGN)  + (HCD_MAX_PERIODIC_QH * HCD_dQH_ALIGN))  //(64 * 1024 * 2 )
+#define MEMORY_SIZE (((HCD_NUM_BUFFER_PTR * 4096)*HCD_MAX_QTD) + (HCD_MAX_QTD * HCD_dTD_ALIGN) + (HCD_MAX_QH * HCD_dQH_ALIGN) +4096)
 #define USBDEVICEID 0	//xilinx zynq could have 2 instances of USB host
 #define HCD_ERROR -1
 
@@ -130,47 +122,16 @@ typedef struct{
 }hcd_QH_st;
 
 
-typedef struct {
-	u32 address_complete;
-	u32 configure_complete;
-	u32 suspend_complete;
-}hcd_device_flags_st;
-
-typedef union {
-	u32 data;
-	hcd_device_flags_st state;
-}hcd_device_flags;
-
-typedef enum {
-	hcd_disconnected,
-	hcd_attached 	,
-	hcd_powered		,
-	hcd_getDeviceDescriptor,
-	hcd_reset		,
-	hcd_setAddress,
-	hcd_getDeviceDescriptorFull,
-	hcd_default		,
-	hcd_getStatus	,
-	hcd_getConfiguration,
-	hcd_getConfigurationFull,
-	hcd_address		,
-	hcd_configured	,
-	hcd_idle		,
-	hcd_suspended	,
-}hcd_state;
-
 typedef struct{
 	hcd_config config;
 	u32 asyncDMAMemPhys;
 	u32 periodicDMAMemPhys;
 	u32 asycPhysAligned;
 	u32 periodicPhysAligned;
-	hcd_QH_st * asyncQH[HCD_MAX_QH];
+	hcd_QH_st  * asyncQH[HCD_MAX_QH];
 	hcd_qTD_st * asyncqTD[HCD_MAX_QTD];
-	hcd_QH_st * periodicQH[HCD_MAX_QH];
+	hcd_QH_st  * periodicQH[HCD_MAX_QH];
 	hcd_qTD_st * periodicqTD[HCD_MAX_QTD];
-
-	u8 busy;							//set to 1 when the async list is enabled
 
 	hcd_IntrHandlerFunc	HandlerFunc;	/**< Handler function for the controller. */
 	void *HandlerRef;					/**< User data reference for the handler. */
@@ -180,11 +141,8 @@ typedef struct{
 	void *ClassHandlerRef;					/**< User data reference for the handler. */
 	u32 ClassHandlerMask;					/**< User interrupt mask. Defines which interrupts will cause the callback to be called. */
 
-
-	u8 deviceConnected;
-	u8 speedDetected;
-	hcd_state state;
-	hcd_device_flags flags;
+	hcd_endpoint0 *ep0;
+	hcd_endpoint0 *ep1;
 }hcd_t;
 
 
@@ -326,14 +284,14 @@ typedef enum{
 SM_return hcd_init(hcd_params *pvParameters,void * event);
 
 /*Public methods*/
+void hcd_printEP0(void);
 int hcd_start(hcd_params *pvParameters , XScuGic *IntcPtr);
 int hcd_resetPort(hcd_t *hcdPtr);
 int hcd_stop(hcd_t *hcdPtr);
 int hcd_cleanup(hcd_t *hcdPtr);
-void hcd_printEP0(void);
 int hcd_connectClassHandler(hcd_t *hcdPtr, hcd_IntrHandlerFunc CallBackFunc,void *CallBackRef);
-void hcd_sendSetupData(hcd_t *hcdPtr,hcd_endpoint0* ep0Ptr);
-void hcd_enquePeriodicQH(hcd_t *hcdPtr,hcd_endpoint0* epPtr);
+void hcd_sendSetupData(hcd_t *hcdPtr);
+void hcd_enquePeriodicQH(hcd_t *hcdPtr);
 void hcd_enqueNextPeriodicQH(hcd_t *hcdPtr);
 hcd_endpoint0* hcd_getEp0();
 

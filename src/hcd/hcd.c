@@ -9,6 +9,8 @@
 #include "xgpio.h"
 #include "xil_exception.h"
 
+#include "xil_mmu.h"
+
 
 extern XScuGic XScuGicInstance;
 
@@ -27,10 +29,6 @@ static void hcd_HostIntrHandler(void *HandlerRef);
 static void hcd_UsbHostIntrHandler(void *CallBackRef, u32 Mask);
 static SM_return hcd_sm_disconnected(hcd_params *pvParameters, void * event);
 
-hcd_endpoint0* hcd_getEp0(){
-	hcd_endpoint0 *ep0Ptr = &ep0;
-	return ep0Ptr;
-}
 
 static void hcd_printLine(u8* data, u32 size, char* comment){
 	int i;
@@ -44,7 +42,7 @@ void hcd_printEP0(void){
 	int interface = 0;
 	int endpoint = 0;
 	int class = 0;
-	hcd_endpoint0 *ep0Ptr  = hcd_getEp0();
+	hcd_endpoint0 *ep0Ptr  = &ep0;
 
 	hcd_printLine( (u8*)(&ep0Ptr->deviceDescriptor), sizeof(hcd_standardDeviceDescriptor), "Device Descriptor" );
 	hcd_printLine( (u8*)(&ep0Ptr->configurationDescriptor.stdConfiguration), sizeof(hcd_standardConfigurationDescriptor_st), "Configuration Descriptor" );
@@ -62,26 +60,16 @@ void hcd_printEP0(void){
 	}
 }
 
-static void hcd_setQueueBusy(u8 busy){
-	hcd.busy = busy;
-}
-
-//static u8 hcd_checkBusy(void){
-//	return hcd.busy;
-//}
 
 static void hcd_enablePeriodicList(hcd_t *hcdPtr){
-	hcd_setQueueBusy(BUSY);
 	hcd_SetBits(hcdPtr, HCD_CMD_OFFSET, HCD_CMD_PSE_MASK);
 }
 
 static void hcd_disableAsyncList(hcd_t *hcdPtr){
 	hcd_ClrBits(hcdPtr, HCD_CMD_OFFSET,HCD_CMD_IAA_MASK | HCD_CMD_ASE_MASK);
-	hcd_setQueueBusy(NOT_BUSY);
 }
 
 static void hcd_enableAsyncList(hcd_t *hcdPtr){
-	hcd_setQueueBusy(BUSY);
 	hcd_SetBits(hcdPtr, HCD_CMD_OFFSET,HCD_CMD_IAA_MASK | HCD_CMD_ASE_MASK);
 }
 
@@ -114,14 +102,12 @@ static void hcd_initializeAsyncQueues(hcd_t * hcdPtr, u8 * p){
 		hcdPtr->asyncQH[i] = (hcd_QH_st *)p;
 		p += HCD_dQH_ALIGN;
 	}
-	Xil_DCacheFlush();
 
 	//Initialize the dTD pointers
 	for (i = 0; i < HCD_MAX_QTD; i++) {
 		hcdPtr->asyncqTD[i] = (hcd_qTD_st *)p;
 		p += HCD_dTD_ALIGN;
 	}
-	Xil_DCacheFlush();
 
 	p = (u8*)(((u32)p + HCD_dQH_BASE_ALIGN) & ~(HCD_dQH_BASE_ALIGN -1));
 
@@ -184,7 +170,6 @@ static int hcd_asyncqTDEnque(hcd_qTD_st *hcdPtr, hcd_qTD_st *qTD){
 	int status = 0;
 
 	memcpy(hcdPtr, qTD,sizeof(hcd_qTD_st) - (5 * sizeof(u32)));
-	Xil_DCacheFlushRange((INTPTR)hcdPtr,sizeof(hcdPtr));
 
 	return status;
 }
@@ -192,7 +177,6 @@ static int hcd_asyncqTDEnque(hcd_qTD_st *hcdPtr, hcd_qTD_st *qTD){
 static int hcd_QHEnque(hcd_QH_st *hcdPtr, hcd_QH_st *QH){
 	int status = 0;
 	memcpy(hcdPtr, QH,sizeof(hcd_QH_st));
-	Xil_DCacheFlushRange((INTPTR)hcdPtr,sizeof(hcdPtr));
 
 	return status;
 }
@@ -262,11 +246,9 @@ static void hcd_configureQueues(hcd_t *hcdPtr){
 static void hcd_initialize_memory(hcd_t *hcdPtr, u8 *AsyncMemPtr, u8 *PeriodicMemPtr){
 
 	memset(AsyncMemPtr,0,MEMORY_SIZE);
-	Xil_DCacheFlushRange((unsigned int)AsyncMemPtr, MEMORY_SIZE);
 	hcdPtr->asyncDMAMemPhys = (u32) AsyncMemPtr;
 
 	memset(PeriodicMemPtr,0,MEMORY_SIZE);
-	Xil_DCacheFlushRange((unsigned int)PeriodicMemPtr, MEMORY_SIZE);
 	hcdPtr->periodicDMAMemPhys = (u32) PeriodicMemPtr;
 
 
@@ -295,14 +277,6 @@ static void hcd_resetUSB(hcd_t *hcdPtr){
 	xil_printf("USB controller Reset Complete... \r\n");
 }
 
-static void hcd_clearFlags(hcd_t *hcdPtr){
-
-	hcdPtr->deviceConnected = 0;
-	hcdPtr->speedDetected = 0;
-	hcdPtr->state  = hcd_disconnected;
-	hcdPtr->flags.data =0;
-
-}
 
 int hcd_connectClassHandler(hcd_t *hcdPtr, hcd_IntrHandlerFunc CallBackFunc,void *CallBackRef){
 	Xil_AssertNonvoid(hcdPtr != NULL);
@@ -341,9 +315,6 @@ hcd_t * hcd_initialize(void){
 	hcd_configureQueues(hcdPtr);
 
 	hcd_WriteLists(hcdPtr);
-
-	hcd_clearFlags(hcdPtr);
-
 
 	return hcdPtr;
 }
@@ -496,19 +467,19 @@ int hcd_cleanup(hcd_t *hcdPtr){		//todo implement the cleanup proces
 	return 0;
 }
 
-static void hcd_initEp0(){
-	ep0.address =0;
-	ep0.maxPacketSize = 0;
-	hcd_setQueueBusy(NOT_BUSY);
+static void hcd_initEp0(hcd_t *hcdPtr){
+	hcdPtr->ep0 = &ep0;
+	hcdPtr->ep0->address =0;
+	hcdPtr->ep0->maxPacketSize = 0;
 }
 
 static void hcd_changeAddress(u8 address){
 	ep0.address =address;
 }
 
-static hcd_endpoint0* hcd_createGetDeviceDescriptor(void){
+static void hcd_createGetDeviceDescriptor(hcd_t *hcdPtr){
 
-	hcd_endpoint0 *ep0Ptr = hcd_getEp0();
+	hcd_endpoint0 *ep0Ptr = hcdPtr->ep0;
 
 	ep0Ptr->setupData.bmRequestType = DEVICE_TO_HOST | STANDARD_TYPE | DEVICE_RECIPIENT;//0b10000000; // device to host, standard type, Device
 	ep0Ptr->setupData.bRequest 		= GET_DESCRIPTOR;
@@ -531,29 +502,27 @@ static hcd_endpoint0* hcd_createGetDeviceDescriptor(void){
 	}
 	ep0Ptr->expectReply = 1;
 
-	Xil_DCacheFlush();
-
-	return ep0Ptr;
+	return;
 }
 
-static hcd_endpoint0* hcd_createSetAddress(void){
 
-	hcd_endpoint0 *ep0Ptr = hcd_getEp0();
+static void hcd_createSetAddress(hcd_t *hcdPtr, u8 address){
+
+	hcd_endpoint0 *ep0Ptr = hcdPtr->ep0;
 
 	ep0Ptr->setupData.bmRequestType = HOST_TO_DEVICE | STANDARD_TYPE | DEVICE_RECIPIENT; //0b00000000; // host to device, standard type, Device
 	ep0Ptr->setupData.bRequest 		= SET_ADDRESS;
-	ep0Ptr->setupData.wValue 		= 1;//hcd_swap_uint16(DEVICE_TYPE);
+	ep0Ptr->setupData.wValue 		= address;//hcd_swap_uint16(DEVICE_TYPE);
 	ep0Ptr->setupData.wIndex 		= hcd_swap_uint16(0x0000);
 	ep0Ptr->setupData.wLength 		= (0);
 
 	ep0Ptr->expectReply = 0;
-	Xil_DCacheFlush();
-	return ep0Ptr;
+	return;
 }
 
-static hcd_endpoint0* hcd_createGetConfiguration(void){
+static void hcd_createGetConfiguration(hcd_t *hcdPtr){
 
-	hcd_endpoint0 *ep0Ptr = hcd_getEp0();
+	hcd_endpoint0 *ep0Ptr = hcdPtr->ep0;
 
 	ep0Ptr->setupData.bmRequestType	= DEVICE_TO_HOST | STANDARD_TYPE | DEVICE_RECIPIENT; //0b00000000; // host to device, standard type, Device
 	ep0Ptr->setupData.bRequest 		= GET_DESCRIPTOR;
@@ -568,13 +537,12 @@ static hcd_endpoint0* hcd_createGetConfiguration(void){
 	}
 
 	ep0Ptr->expectReply = 1;
-	Xil_DCacheFlush();
-	return ep0Ptr;
+	return;
 }
 
-static hcd_endpoint0* hcd_createGetStatus(void){
+static void hcd_createGetStatus(hcd_t *hcdPtr){
 
-	hcd_endpoint0 *ep0Ptr = hcd_getEp0();
+	hcd_endpoint0 *ep0Ptr = hcdPtr->ep0;
 
 	ep0Ptr->setupData.bmRequestType	= DEVICE_TO_HOST | STANDARD_TYPE | DEVICE_RECIPIENT; //0b00000000; // host to device, standard type, Device
 	ep0Ptr->setupData.bRequest 		= GET_STATUS_REQUEST;
@@ -583,13 +551,12 @@ static hcd_endpoint0* hcd_createGetStatus(void){
 	ep0Ptr->setupData.wLength 		= 2;
 
 	ep0Ptr->expectReply = 1;
-	Xil_DCacheFlush();
-	return ep0Ptr;
+	return;
 }
 
-static hcd_endpoint0* hcd_createSetConfiguration(u16 config){
+static void hcd_createSetConfiguration(hcd_t *hcdPtr,u16 config){
 
-	hcd_endpoint0 *ep0Ptr = hcd_getEp0();
+	hcd_endpoint0 *ep0Ptr = hcdPtr->ep0;
 
 	ep0Ptr->setupData.bmRequestType	= HOST_TO_DEVICE | STANDARD_TYPE | DEVICE_RECIPIENT; //0b00000000; // host to device, standard type, Device
 	ep0Ptr->setupData.bRequest 		= SET_CONFIGURATION;
@@ -598,8 +565,7 @@ static hcd_endpoint0* hcd_createSetConfiguration(u16 config){
 	ep0Ptr->setupData.wLength 		= 0;
 
 	ep0Ptr->expectReply = 1;
-	Xil_DCacheFlush();
-	return ep0Ptr;
+	return;
 }
 
 void hcd_enqueNextPeriodicQH(hcd_t *hcdPtr) {
@@ -614,12 +580,15 @@ void hcd_enqueNextPeriodicQH(hcd_t *hcdPtr) {
 	hcdPtr->periodicqTD[1]->buffer[0] &= 0xfffff000;
 
 	hcdPtr->periodicQH[0]->overlay.nextqTD = (int) hcdPtr->periodicqTD[1] | 0x0;
+#ifndef HCD_DISABLE_CACHE
 	Xil_DCacheFlush();
-
+#endif
 }
 
 
-void hcd_enquePeriodicQH(hcd_t *hcdPtr,hcd_endpoint0* epPtr){
+void hcd_enquePeriodicQH(hcd_t *hcdPtr){
+
+	hcd_endpoint0* epPtr = hcdPtr->ep1;
 
 	hcd_configurePeriodicQueues(hcdPtr);
 
@@ -680,7 +649,6 @@ void hcd_enquePeriodicQH(hcd_t *hcdPtr,hcd_endpoint0* epPtr){
 
 //	////// setup periodic list
 //	memcpy((void*)hcdPtr->QH[0] , &empty_QH, sizeof(hcd_QH_st));
-//	Xil_DCacheFlush();
 
 
 	memcpy(&QH , &empty_QH, sizeof(hcd_QH_st));
@@ -701,7 +669,6 @@ void hcd_enquePeriodicQH(hcd_t *hcdPtr,hcd_endpoint0* epPtr){
 //	QH.endpoint_word2 		= w2.data;
 //	QH.overlay.nextqTD 		= (int)hcdPtr->periodicqTD[1] | 0x0;
 //	QH.overlay.nextqTD_alt 	= 0x1;
-////	Xil_DCacheFlush();
 //	hcd_QHEnque(hcdPtr->periodicQH[1], &QH);
 
 
@@ -717,14 +684,17 @@ void hcd_enquePeriodicQH(hcd_t *hcdPtr,hcd_endpoint0* epPtr){
 
 
 	hcd_WriteReg(hcdPtr->config.BaseAddress, HCD_LISTBASE_OFFSET,(u32)hcdPtr->periodicQH[0] - 0x20);
-
+#ifndef HCD_DISABLE_CACHE
+	Xil_DCacheFlush();
+#endif
 	hcd_enablePeriodicList(hcdPtr);
 
-	Xil_DCacheFlush();
 
 }
 
-void hcd_sendSetupData(hcd_t *hcdPtr,hcd_endpoint0* ep0Ptr){
+void hcd_sendSetupData(hcd_t *hcdPtr){
+
+	hcd_endpoint0* ep0Ptr = hcdPtr->ep0;
 
 	hcd_configureAsyncQueues(hcdPtr);
 
@@ -744,8 +714,7 @@ void hcd_sendSetupData(hcd_t *hcdPtr,hcd_endpoint0* ep0Ptr){
 	token.st = (hcd_qTD_token_st){0x80,HCD_SETUP_TOKEN,0,0,0,sizeof(hcd_SetupData),0};
 	qTD.token					= token.data;
 	hcd_asyncqTDEnque(hcdPtr->asyncqTD[0], &qTD);
-	memcpy((void*)(hcdPtr->asyncqTD[0]->buffer[0]&0xfffff000), ep0Ptr, sizeof(hcd_SetupData));
-	Xil_DCacheFlush();
+	memcpy((void*)(hcdPtr->asyncqTD[0]->buffer[0]&0xfffff000), &ep0Ptr->setupData, sizeof(hcd_SetupData));
 
 	if(ep0Ptr->expectReply){
 		///// setup the next qTD
@@ -754,7 +723,6 @@ void hcd_sendSetupData(hcd_t *hcdPtr,hcd_endpoint0* ep0Ptr){
 		token.st 					= (hcd_qTD_token_st){0x80,HCD_IN_TOKEN,0,0,0,(ep0Ptr->setupData.wLength),1};
 		qTD.token					= token.data;
 		hcd_asyncqTDEnque(hcdPtr->asyncqTD[1], &qTD);
-		Xil_DCacheFlush();
 
 		///// setup the next qTD
 		qTD.nextqTD 				= (int)hcdPtr->asyncqTD[3] | 0x0;
@@ -762,7 +730,6 @@ void hcd_sendSetupData(hcd_t *hcdPtr,hcd_endpoint0* ep0Ptr){
 		token.st = (hcd_qTD_token_st){0x80,HCD_OUT_TOKEN,0,0,1,0x0,1};
 		qTD.token					= token.data;
 		hcd_asyncqTDEnque(hcdPtr->asyncqTD[2], &qTD);
-		Xil_DCacheFlush();
 
 	}
 	else{
@@ -772,7 +739,6 @@ void hcd_sendSetupData(hcd_t *hcdPtr,hcd_endpoint0* ep0Ptr){
 		token.st 					= (hcd_qTD_token_st){0x80,HCD_IN_TOKEN,0,0,0,0,1};
 		qTD.token					= token.data;
 		hcd_asyncqTDEnque(hcdPtr->asyncqTD[1], &qTD);
-		Xil_DCacheFlush();
 	}
 
 	///// setup the next qTD
@@ -781,7 +747,6 @@ void hcd_sendSetupData(hcd_t *hcdPtr,hcd_endpoint0* ep0Ptr){
 	token.st = (hcd_qTD_token_st){0x00,0x0,0,0,1,0x0,0};
 	qTD.token					= token.data;
 	hcd_asyncqTDEnque(hcdPtr->asyncqTD[3], &qTD);
-	Xil_DCacheFlush();
 
 
 	w1.st = (hcd_QH_endpoint_word1_st){ep0Ptr->address,0,0,ep0Ptr->speed,0,1,ep0Ptr->maxPacketSize,1,0xf};
@@ -791,14 +756,15 @@ void hcd_sendSetupData(hcd_t *hcdPtr,hcd_endpoint0* ep0Ptr){
 	QH.endpoint_word2 		= w2.data;
 	QH.overlay.nextqTD 		= (int)hcdPtr->asyncqTD[0] | 0x0;
 	QH.overlay.nextqTD_alt 	= 0x1;
-	Xil_DCacheFlush();
 	hcd_QHEnque(hcdPtr->asyncQH[0], &QH);
-
+#ifndef HCD_DISABLE_CACHE
+	Xil_DCacheFlush();
+#endif
 	hcd_enableAsyncList(hcdPtr);
 }
 
 static hcd_endpoint0*  hcd_parseDeviceDescriptor(hcd_t *hcdPtr){
-	hcd_endpoint0 *ep0Ptr  = hcd_getEp0();
+	hcd_endpoint0 *ep0Ptr  = hcdPtr->ep0;
 
 	hcd_standardDeviceDescriptor* stdDevDesc =(hcd_standardDeviceDescriptor*)(hcdPtr->asyncqTD[1]->buffer[0] & 0xfffff000);
 	ep0Ptr->deviceDescriptor = *stdDevDesc;
@@ -809,7 +775,7 @@ static hcd_endpoint0*  hcd_parseDeviceDescriptor(hcd_t *hcdPtr){
 }
 
 static hcd_endpoint0*  hcd_parseConfigurationDescriptor(hcd_t *hcdPtr){
-	hcd_endpoint0 *ep0Ptr  = hcd_getEp0();
+	hcd_endpoint0 *ep0Ptr  = hcdPtr->ep0;
 	void* ptr = NULL;
 	static u8 descriptors[4096];	//todo: calculate based on max configs/interface/endpoints supported
 
@@ -860,7 +826,7 @@ static hcd_endpoint0*  hcd_parseConfigurationDescriptor(hcd_t *hcdPtr){
 }
 
 static hcd_endpoint0*  hcd_parseStatus(hcd_t *hcdPtr){
-	hcd_endpoint0 *ep0Ptr  = hcd_getEp0();
+	hcd_endpoint0 *ep0Ptr  = hcdPtr->ep0;
 
 	u16* devStatus =(u16*)(hcdPtr->asyncqTD[1]->buffer[0] & 0xfffff000);
 	ep0Ptr->deviceStatus = *devStatus;
@@ -930,21 +896,10 @@ static void hcd_UsbHostIntrHandler(void *CallBackRef, u32 Mask)
 
 		if ((portStatus & HCD_PORTSCR_CCS_MASK) == HCD_PORTSCR_CCS_MASK) {
 
-			if (hcdPtr->deviceConnected == 0) {
-				hcdPtr->deviceConnected = 1;
-				hcdPtr->speedDetected = (portStatus >> 26) & 0x03;
-				hcdPtr->state = hcd_powered;
-				hcdPtr->flags.data = 0;
-			}
-			hcdPtr->speedDetected = (portStatus >> 26) & 0x03;
-
 			event = hcd_event_powered;
 			xQueueSendFromISR(pvParameters->statemachine.stateQueue, &event,
 					&pvParameters->xHigherPriorityTaskWoken);
 		} else {
-			hcdPtr->deviceConnected = 0;
-			hcdPtr->speedDetected = (portStatus >> 26) & 0x03;
-			hcdPtr->state = hcd_disconnected;
 			event = hcd_event_disconnected;
 			xQueueSendFromISR(pvParameters->statemachine.stateQueue, &event,
 					&pvParameters->xHigherPriorityTaskWoken);
@@ -1060,7 +1015,8 @@ static SM_return hcd_sm_configured(hcd_params *pvParameters, void * event) {
 	hcd_t * hcdPtr = pvParameters->hcdPtr;
 	switch (*e) {
 	case hcd_event_enter:
-		hcd_sendSetupData(hcdPtr,hcd_createSetConfiguration(1));
+		hcd_createSetConfiguration(hcdPtr,1);
+		hcd_sendSetupData(hcdPtr);
 		ret = state_handled;
 		break;
 	case hcd_event_asyncComplete:
@@ -1091,12 +1047,12 @@ static SM_return hcd_sm_default(hcd_params *pvParameters, void * event) {
 	hcd_t * hcdPtr = pvParameters->hcdPtr;
 	switch (*e) {
 	case hcd_event_enter:
-		hcd_sendSetupData(hcdPtr,hcd_createGetStatus());
+		hcd_createGetStatus(hcdPtr);
+		hcd_sendSetupData(hcdPtr);
 		ret = state_handled;
 		break;
 	case hcd_event_asyncComplete:
 		hcd_parseStatus(hcdPtr);
-//		hcd_printEP0();
 		nextState((void*)pvParameters, (void*)hcd_sm_configured);
 		ret = state_transition;
 		break;
@@ -1122,7 +1078,8 @@ static SM_return hcd_sm_getConfigurationFull(hcd_params *pvParameters, void * ev
 	hcd_t * hcdPtr = pvParameters->hcdPtr;
 	switch (*e) {
 	case hcd_event_enter:
-		hcd_sendSetupData(hcdPtr,hcd_createGetConfiguration());
+		hcd_createGetConfiguration(hcdPtr);
+		hcd_sendSetupData(hcdPtr);
 		ret = state_handled;
 		break;
 	case hcd_event_asyncComplete:
@@ -1152,7 +1109,8 @@ static SM_return hcd_sm_getConfiguration(hcd_params *pvParameters, void * event)
 	hcd_t * hcdPtr = pvParameters->hcdPtr;
 	switch (*e) {
 	case hcd_event_enter:
-		hcd_sendSetupData(hcdPtr,hcd_createGetConfiguration());
+		hcd_createGetConfiguration(hcdPtr);
+		hcd_sendSetupData(hcdPtr);
 		ret = state_handled;
 		break;
 	case hcd_event_asyncComplete:
@@ -1183,7 +1141,8 @@ static SM_return hcd_sm_getDeviceDescriptorFull(hcd_params *pvParameters, void *
 	switch (*e) {
 	case hcd_event_enter:
 		hcd_changeAddress(1);
-		hcd_sendSetupData(hcdPtr,hcd_createGetDeviceDescriptor());
+		hcd_createGetDeviceDescriptor(hcdPtr);
+		hcd_sendSetupData(hcdPtr);
 		ret = state_handled;
 		break;
 	case hcd_event_asyncComplete:
@@ -1213,7 +1172,8 @@ static SM_return hcd_sm_setAddress(hcd_params *pvParameters, void * event) {
 	hcd_t * hcdPtr = pvParameters->hcdPtr;
 	switch (*e) {
 	case hcd_event_enter:
-		hcd_sendSetupData(hcdPtr,hcd_createSetAddress());
+		hcd_createSetAddress(hcdPtr,1);
+		hcd_sendSetupData(hcdPtr);
 		ret = state_handled;
 		break;
 	case hcd_event_asyncComplete:
@@ -1271,7 +1231,8 @@ static SM_return hcd_sm_getDeviceDescriptor(hcd_params *pvParameters, void * eve
 	hcd_t * hcdPtr = pvParameters->hcdPtr;
 	switch (*e) {
 	case hcd_event_enter:
-		hcd_sendSetupData(hcdPtr,hcd_createGetDeviceDescriptor());
+		hcd_createGetDeviceDescriptor(hcdPtr);
+		hcd_sendSetupData(hcdPtr);
 		ret = state_handled;
 		break;
 	case hcd_event_asyncComplete:
@@ -1302,7 +1263,7 @@ static SM_return hcd_sm_powered(hcd_params *pvParameters, void * event) {
 	switch (*e) {
 	case hcd_event_enter:
 		hcd_resetPort(hcdPtr);
-		hcd_initEp0();
+		hcd_initEp0(hcdPtr);
 		ret = state_handled;
 
 		break;
@@ -1352,12 +1313,26 @@ static SM_return hcd_sm_disconnected(hcd_params *pvParameters, void * event) {
 
 SM_return hcd_init(hcd_params *pvParameters, void * event) {
 
+
+#ifdef HCD_DISABLE_CACHE
+	// disables the cache to the variables assosiated to the queues
+	// The attributes covers 1MB of memory
+	Xil_SetTlbAttributes((UINTPTR)(hcd_AsycHostBuffer)		, NORM_NONCACHE);
+	Xil_SetTlbAttributes((UINTPTR)(hcd_PeriodicHostBuffer)	, NORM_NONCACHE);
+	Xil_SetTlbAttributes((UINTPTR)(&ep0)	, NORM_NONCACHE);
+#endif
+
+
+	xil_printf("\r\nAddress of hcd_AsycHostBuffer = %08X\r\n",&hcd_AsycHostBuffer);
+	xil_printf("Address of hcd_PeriodicHostBuffer = %08X\r\n",&hcd_PeriodicHostBuffer);
+	xil_printf("Address of ep0 = %08X\r\n",&ep0);
+
+
 	pvParameters->hcdPtr = hcd_initialize();
 
 	hcd_connectClassHandler(pvParameters->hcdPtr, hid_callbackHandler, pvParameters->hcdPtr);
 	hcd_start(pvParameters, &XScuGicInstance);// Start interrupts and handles the enumeration of devices registers interrupt handler
 
-//	hid_requestReport(pvParameters->hcdPtr);
 
 
 	nextState((void*)pvParameters, (void*)hcd_sm_disconnected);
