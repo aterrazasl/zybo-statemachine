@@ -17,7 +17,7 @@ extern "C" {
 
 /* Definitions */
 
-#define HCD_DISABLE_CACHE 0	//1 Sets the memory table attributes to disable the cache, 0 flushes the memory when needed
+//#define HCD_DISABLE_CACHE 0	//1 Sets the memory table attributes to disable the cache, 0 flushes the memory when needed
 
 #define HCD_NUM_BUFFER_PTR 1
 #define HCD_MAX_QTD	4
@@ -260,6 +260,8 @@ typedef struct {
 typedef enum{
 	hcd_event_init,
 	hcd_event_enter,
+	hcd_event_exit,
+	// base events handled by the state machine
 	hcd_event_asyncComplete,
 	hcd_event_periodComplete,
 	hcd_event_disconnected,
@@ -276,8 +278,7 @@ typedef enum{
 	hcd_event_address		,
 	hcd_event_configured	,
 	hcd_event_idle		,
-	hcd_event_suspended	,
-	hcd_event_exit
+	hcd_event_suspended
 }hcd_events;
 
 

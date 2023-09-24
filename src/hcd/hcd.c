@@ -1311,7 +1311,49 @@ static SM_return hcd_sm_disconnected(hcd_params *pvParameters, void * event) {
 	return ret;
 }
 
+
+
 SM_return hcd_init(hcd_params *pvParameters, void * event) {
+
+	hcd_events *e = (hcd_events*) event;
+	SM_return ret = state_handled;
+	switch (*e) {
+	case hcd_event_init:
+#ifdef HCD_DISABLE_CACHE
+		// disables the cache to the variables assosiated to the queues
+		// The attributes covers 1MB of memory
+		Xil_SetTlbAttributes((UINTPTR) (hcd_AsycHostBuffer), NORM_NONCACHE);
+		Xil_SetTlbAttributes((UINTPTR) (hcd_PeriodicHostBuffer), NORM_NONCACHE);
+		Xil_SetTlbAttributes((UINTPTR) (&ep0), NORM_NONCACHE);
+#endif
+
+		xil_printf("\r\nAddress of hcd_AsycHostBuffer = %08X\r\n",
+				&hcd_AsycHostBuffer);
+		xil_printf("Address of hcd_PeriodicHostBuffer = %08X\r\n",
+				&hcd_PeriodicHostBuffer);
+		xil_printf("Address of ep0 = %08X\r\n", &ep0);
+
+		pvParameters->hcdPtr = hcd_initialize();
+
+		hcd_connectClassHandler(pvParameters->hcdPtr, hid_callbackHandler,
+				pvParameters->hcdPtr);
+		hcd_start(pvParameters, &XScuGicInstance);// Start interrupts and handles the enumeration of devices registers interrupt handler
+
+		nextState((void*) pvParameters, (void*) hcd_sm_disconnected);
+		ret = state_transition;
+		break;
+	case hcd_event_exit:
+		ret = state_handled;
+		break;
+	default:
+		ret = state_error;
+		break;
+	}
+	hcd_printEvent(*e);
+	return ret;
+}
+
+SM_return hcd_init_old(hcd_params *pvParameters, void * event) {
 
 
 #ifdef HCD_DISABLE_CACHE

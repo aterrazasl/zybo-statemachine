@@ -62,6 +62,29 @@ static SM_return Blinky1_off(blinky1_params *pvParameters,void * event) {
 }
 
 SM_return Blinky1_init(blinky1_params *pvParameters,void * event) {
+	events *e = (events*) event;
+	SM_return ret = state_handled;
+	switch (*e) {
+	case event_init:
+		pvParameters->timerCallbackFunc = vTimerCallback;
+
+		pvParameters->timerhandle = xTimerCreate("SM_Timer", 100, pdFALSE, pvParameters,
+				pvParameters->timerCallbackFunc);
+		nextState((void*)pvParameters, (void*)Blinky1_on);
+
+		ret = state_transition;
+		break;
+	case event_exit:
+		ret = state_handled;
+		break;
+	default:
+		ret = state_error;
+		break;
+	}
+	return ret;
+}
+
+SM_return Blinky1_init_old(blinky1_params *pvParameters,void * event) {
 	pvParameters->timerCallbackFunc = vTimerCallback;
 
 	pvParameters->timerhandle = xTimerCreate("SM_Timer", 100, pdFALSE, pvParameters,
