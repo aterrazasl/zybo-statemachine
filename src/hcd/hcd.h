@@ -253,6 +253,8 @@ static const hcd_qTD_st empty_qTD = {	0x0001,	//nextqTD
 
 typedef struct {
 	SM_params statemachine;
+	TimerHandle_t timerhandle;
+	TimerCallbackFunction_t timerCallbackFunc;
 	hcd_t * hcdPtr;
 	BaseType_t xHigherPriorityTaskWoken;
 } hcd_params;
@@ -262,6 +264,7 @@ typedef enum{
 	hcd_event_enter,
 	hcd_event_exit,
 	// base events handled by the state machine
+	hcd_timer_tick,
 	hcd_event_asyncComplete,
 	hcd_event_periodComplete,
 	hcd_event_disconnected,

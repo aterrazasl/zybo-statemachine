@@ -456,6 +456,9 @@ int hcd_start(hcd_params *pvParameters , XScuGic *IntcPtr){
 
 int hcd_resetPort(hcd_t *hcdPtr){
 	hcd_WriteReg(hcdPtr->config.BaseAddress, HCD_PORTSCR1_OFFSET, HCD_PORTSCR_PR_MASK | hcd_ReadReg(hcdPtr->config.BaseAddress, HCD_PORTSCR1_OFFSET));
+//	while(hcd_ReadReg(hcdPtr->config.BaseAddress, HCD_PORTSCR1_OFFSET) & HCD_PORTSCR_PR_MASK){
+//		asm("nop");
+//	}
 	return 0;
 }
 
@@ -889,10 +892,10 @@ static void hcd_UsbHostIntrHandler(void *CallBackRef, u32 Mask)
 		u32 portStatus = hcd_ReadReg(hcdPtr->config.BaseAddress,
 				HCD_PORTSCR1_OFFSET);
 
-		xil_printf("[Interrupt] Port changed... mask = %08X; count = %d\r\n",
-				Mask, count);
-		xil_printf("[Interrupt] Register HCD_PORTSCR1_OFFSET = %08X \r\n",
-				portStatus);
+//		xil_printf("[Interrupt] Port changed... mask = %08X; count = %d\r\n",
+//				Mask, count);
+//		xil_printf("[Interrupt] Register HCD_PORTSCR1_OFFSET = %08X \r\n",
+//				portStatus);
 
 		if ((portStatus & HCD_PORTSCR_CCS_MASK) == HCD_PORTSCR_CCS_MASK) {
 
@@ -947,7 +950,7 @@ static void hcd_UsbHostIntrHandler(void *CallBackRef, u32 Mask)
 
 	if(Mask & HCD_IXR_UA_MASK ){
 		qTDcount++;
-		xil_printf("[Interrupt] USB Transaction complete!. mask = %08X; count = %d; qTDCount = %d\r\n",Mask,count,qTDcount);
+//		xil_printf("[Interrupt] USB Transaction complete!. mask = %08X; count = %d; qTDCount = %d\r\n",Mask,count,qTDcount);
 		hcd_disableAsyncList(hcdPtr);
 //		hcd_disablePeriodicList(hcdPtr);
 //		hcd_configurePeriodicQueues(hcdPtr);
@@ -970,12 +973,16 @@ static void hcd_UsbHostIntrHandler(void *CallBackRef, u32 Mask)
 }
 
 
-static void hcd_printEvent(hcd_events e){
+static void hcd_printEvent(hcd_events e) {
 //	xil_printf("%d\r\n",e);
-
 }
 
+static void vTimerCallback(TimerHandle_t xTimer) {
+	hcd_events sm_event = hcd_timer_tick;
+	hcd_params * pvParameters = (hcd_params*)pvTimerGetTimerID(xTimer);
 
+	xQueueSend(pvParameters->statemachine.stateQueue, &sm_event, (TickType_t ) 0);
+}
 
 static SM_return hcd_sm_idle(hcd_params *pvParameters, void * event) {
 
@@ -1004,7 +1011,7 @@ static SM_return hcd_sm_idle(hcd_params *pvParameters, void * event) {
 		break;
 	}
 
-	hcd_printEvent(*e);
+//	hcd_printEvent(*e);
 	return ret;
 }
 
@@ -1121,6 +1128,11 @@ static SM_return hcd_sm_getConfiguration(hcd_params *pvParameters, void * event)
 	case hcd_event_disconnected:
 		nextState((void*)pvParameters, (void*)hcd_sm_disconnected);
 		ret = state_transition;
+		break;
+	case hcd_timer_tick:
+		hcd_createGetConfiguration(hcdPtr);
+		hcd_sendSetupData(hcdPtr);
+		ret = state_handled;
 		break;
 	case hcd_event_exit:
 		ret = state_handled;
@@ -1244,6 +1256,11 @@ static SM_return hcd_sm_getDeviceDescriptor(hcd_params *pvParameters, void * eve
 		nextState((void*)pvParameters, (void*)hcd_sm_disconnected);
 		ret = state_transition;
 		break;
+	case hcd_timer_tick:
+		hcd_createGetDeviceDescriptor(hcdPtr);
+		hcd_sendSetupData(hcdPtr);
+		ret = state_handled;
+		break;
 	case hcd_event_exit:
 		ret = state_handled;
 		break;
@@ -1262,10 +1279,9 @@ static SM_return hcd_sm_powered(hcd_params *pvParameters, void * event) {
 	hcd_t * hcdPtr = pvParameters->hcdPtr;
 	switch (*e) {
 	case hcd_event_enter:
-		hcd_resetPort(hcdPtr);
 		hcd_initEp0(hcdPtr);
+		hcd_resetPort(hcdPtr);
 		ret = state_handled;
-
 		break;
 	case hcd_event_powered:
 		nextState((void*)pvParameters, (void*)hcd_sm_getDeviceDescriptor);
@@ -1293,12 +1309,10 @@ static SM_return hcd_sm_disconnected(hcd_params *pvParameters, void * event) {
 	switch (*e) {
 	case hcd_event_enter:
 		ret = state_handled;
-		xil_printf("%s","Waiting for USB device connection\r\n");
 		break;
 	case hcd_event_powered:
 		nextState((void*)pvParameters, (void*)hcd_sm_powered);
 		ret = state_transition;
-		xil_printf("%s","USB device detected\r\n");
 		break;
 	case hcd_event_exit:
 		ret = state_handled;
@@ -1327,17 +1341,16 @@ SM_return hcd_init(hcd_params *pvParameters, void * event) {
 		Xil_SetTlbAttributes((UINTPTR) (&ep0), NORM_NONCACHE);
 #endif
 
-		xil_printf("\r\nAddress of hcd_AsycHostBuffer = %08X\r\n",
-				&hcd_AsycHostBuffer);
-		xil_printf("Address of hcd_PeriodicHostBuffer = %08X\r\n",
-				&hcd_PeriodicHostBuffer);
-		xil_printf("Address of ep0 = %08X\r\n", &ep0);
-
 		pvParameters->hcdPtr = hcd_initialize();
 
 		hcd_connectClassHandler(pvParameters->hcdPtr, hid_callbackHandler,
 				pvParameters->hcdPtr);
 		hcd_start(pvParameters, &XScuGicInstance);// Start interrupts and handles the enumeration of devices registers interrupt handler
+
+		pvParameters->timerCallbackFunc = vTimerCallback;
+		pvParameters->timerhandle = xTimerCreate("HCD_Timer", 5, pdTRUE,
+				pvParameters, pvParameters->timerCallbackFunc);
+		xTimerStart(pvParameters->timerhandle, 0);
 
 		nextState((void*) pvParameters, (void*) hcd_sm_disconnected);
 		ret = state_transition;
@@ -1351,35 +1364,6 @@ SM_return hcd_init(hcd_params *pvParameters, void * event) {
 	}
 	hcd_printEvent(*e);
 	return ret;
-}
-
-SM_return hcd_init_old(hcd_params *pvParameters, void * event) {
-
-
-#ifdef HCD_DISABLE_CACHE
-	// disables the cache to the variables assosiated to the queues
-	// The attributes covers 1MB of memory
-	Xil_SetTlbAttributes((UINTPTR)(hcd_AsycHostBuffer)		, NORM_NONCACHE);
-	Xil_SetTlbAttributes((UINTPTR)(hcd_PeriodicHostBuffer)	, NORM_NONCACHE);
-	Xil_SetTlbAttributes((UINTPTR)(&ep0)	, NORM_NONCACHE);
-#endif
-
-
-	xil_printf("\r\nAddress of hcd_AsycHostBuffer = %08X\r\n",&hcd_AsycHostBuffer);
-	xil_printf("Address of hcd_PeriodicHostBuffer = %08X\r\n",&hcd_PeriodicHostBuffer);
-	xil_printf("Address of ep0 = %08X\r\n",&ep0);
-
-
-	pvParameters->hcdPtr = hcd_initialize();
-
-	hcd_connectClassHandler(pvParameters->hcdPtr, hid_callbackHandler, pvParameters->hcdPtr);
-	hcd_start(pvParameters, &XScuGicInstance);// Start interrupts and handles the enumeration of devices registers interrupt handler
-
-
-
-	nextState((void*)pvParameters, (void*)hcd_sm_disconnected);
-	return state_transition;
-
 }
 
 
