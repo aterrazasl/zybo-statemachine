@@ -974,7 +974,9 @@ static void hcd_UsbHostIntrHandler(void *CallBackRef, u32 Mask)
 
 
 static void hcd_printEvent(hcd_events e) {
+	if (e>102){
 //	xil_printf("%d\r\n",e);
+	}
 }
 
 static void vTimerCallback(TimerHandle_t xTimer) {
@@ -982,6 +984,45 @@ static void vTimerCallback(TimerHandle_t xTimer) {
 	hcd_params * pvParameters = (hcd_params*)pvTimerGetTimerID(xTimer);
 
 	xQueueSend(pvParameters->statemachine.stateQueue, &sm_event, (TickType_t ) 0);
+}
+
+static void parseHID(hcd_t * hcdPtr){
+	hcd_events ret;
+
+	if(hcdPtr->HIDdata[4] == HID_UP_MASK){
+		ret = hid_up;
+		Enqueue_signal(&ret);
+	}
+	if(hcdPtr->HIDdata[4] == HID_DOWN_MASK){
+		ret = hid_down;
+		Enqueue_signal(&ret);
+	}
+	if(hcdPtr->HIDdata[3] == HID_LEFT_MASK){
+		ret = hid_left;
+		Enqueue_signal(&ret);
+	}
+	if(hcdPtr->HIDdata[3] == HID_RIGHT_MASK){
+		ret = hid_right;
+		Enqueue_signal(&ret);
+	}
+	if(hcdPtr->HIDdata[6] == HID_SELECT_MASK){
+		ret = hid_select;
+		Enqueue_signal(&ret);
+	}
+	if(hcdPtr->HIDdata[6] == HID_START_MASK){
+		ret = hid_start;
+		Enqueue_signal(&ret);
+	}
+	if(hcdPtr->HIDdata[5] == HID_B_MASK){
+		ret = hid_b;
+		Enqueue_signal(&ret);
+	}
+	if(hcdPtr->HIDdata[5] == HID_A_MASK){
+		ret = hid_a;
+		Enqueue_signal(&ret);
+	}
+
+
 }
 
 static SM_return hcd_sm_idle(hcd_params *pvParameters, void * event) {
@@ -996,12 +1037,17 @@ static SM_return hcd_sm_idle(hcd_params *pvParameters, void * event) {
 		break;
 	case hcd_event_periodComplete:
 		(hcdPtr->ClassHandlerFunc)(hcdPtr->ClassHandlerRef, 0);
-		hcd_enqueNextPeriodicQH(hcdPtr);
+		parseHID(hcdPtr);
+
 		ret = state_handled;
 		break;
 	case hcd_event_disconnected:
 		nextState((void*)pvParameters, (void*)hcd_sm_disconnected);
 		ret = state_transition;
+		break;
+	case hcd_timer_tick:
+		hcd_enqueNextPeriodicQH(hcdPtr);
+		ret = state_handled;
 		break;
 	case hcd_event_exit:
 		ret = state_handled;
@@ -1011,7 +1057,7 @@ static SM_return hcd_sm_idle(hcd_params *pvParameters, void * event) {
 		break;
 	}
 
-//	hcd_printEvent(*e);
+	hcd_printEvent(*e);
 	return ret;
 }
 
@@ -1022,8 +1068,8 @@ static SM_return hcd_sm_configured(hcd_params *pvParameters, void * event) {
 	hcd_t * hcdPtr = pvParameters->hcdPtr;
 	switch (*e) {
 	case hcd_event_enter:
-		hcd_createSetConfiguration(hcdPtr,1);
-		hcd_sendSetupData(hcdPtr);
+//		hcd_createSetConfiguration(hcdPtr,1);
+//		hcd_sendSetupData(hcdPtr);
 		ret = state_handled;
 		break;
 	case hcd_event_asyncComplete:
@@ -1034,6 +1080,11 @@ static SM_return hcd_sm_configured(hcd_params *pvParameters, void * event) {
 	case hcd_event_disconnected:
 		nextState((void*)pvParameters, (void*)hcd_sm_disconnected);
 		ret = state_transition;
+		break;
+	case hcd_timer_tick:
+		hcd_createSetConfiguration(hcdPtr,1);
+		hcd_sendSetupData(hcdPtr);
+		ret = state_handled;
 		break;
 	case hcd_event_exit:
 		ret = state_handled;
@@ -1054,8 +1105,8 @@ static SM_return hcd_sm_default(hcd_params *pvParameters, void * event) {
 	hcd_t * hcdPtr = pvParameters->hcdPtr;
 	switch (*e) {
 	case hcd_event_enter:
-		hcd_createGetStatus(hcdPtr);
-		hcd_sendSetupData(hcdPtr);
+//		hcd_createGetStatus(hcdPtr);
+//		hcd_sendSetupData(hcdPtr);
 		ret = state_handled;
 		break;
 	case hcd_event_asyncComplete:
@@ -1066,6 +1117,11 @@ static SM_return hcd_sm_default(hcd_params *pvParameters, void * event) {
 	case hcd_event_disconnected:
 		nextState((void*)pvParameters, (void*)hcd_sm_disconnected);
 		ret = state_transition;
+		break;
+	case hcd_timer_tick:
+		hcd_createGetStatus(hcdPtr);
+		hcd_sendSetupData(hcdPtr);
+		ret = state_handled;
 		break;
 	case hcd_event_exit:
 		ret = state_handled;
@@ -1085,8 +1141,8 @@ static SM_return hcd_sm_getConfigurationFull(hcd_params *pvParameters, void * ev
 	hcd_t * hcdPtr = pvParameters->hcdPtr;
 	switch (*e) {
 	case hcd_event_enter:
-		hcd_createGetConfiguration(hcdPtr);
-		hcd_sendSetupData(hcdPtr);
+//		hcd_createGetConfiguration(hcdPtr);
+//		hcd_sendSetupData(hcdPtr);
 		ret = state_handled;
 		break;
 	case hcd_event_asyncComplete:
@@ -1097,6 +1153,11 @@ static SM_return hcd_sm_getConfigurationFull(hcd_params *pvParameters, void * ev
 	case hcd_event_disconnected:
 		nextState((void*)pvParameters, (void*)hcd_sm_disconnected);
 		ret = state_transition;
+		break;
+	case hcd_timer_tick:
+		hcd_createGetConfiguration(hcdPtr);
+		hcd_sendSetupData(hcdPtr);
+		ret = state_handled;
 		break;
 	case hcd_event_exit:
 		ret = state_handled;
@@ -1116,8 +1177,8 @@ static SM_return hcd_sm_getConfiguration(hcd_params *pvParameters, void * event)
 	hcd_t * hcdPtr = pvParameters->hcdPtr;
 	switch (*e) {
 	case hcd_event_enter:
-		hcd_createGetConfiguration(hcdPtr);
-		hcd_sendSetupData(hcdPtr);
+//		hcd_createGetConfiguration(hcdPtr);
+//		hcd_sendSetupData(hcdPtr);
 		ret = state_handled;
 		break;
 	case hcd_event_asyncComplete:
@@ -1152,9 +1213,9 @@ static SM_return hcd_sm_getDeviceDescriptorFull(hcd_params *pvParameters, void *
 	hcd_t * hcdPtr = pvParameters->hcdPtr;
 	switch (*e) {
 	case hcd_event_enter:
-		hcd_changeAddress(1);
-		hcd_createGetDeviceDescriptor(hcdPtr);
-		hcd_sendSetupData(hcdPtr);
+//		hcd_changeAddress(1);
+//		hcd_createGetDeviceDescriptor(hcdPtr);
+//		hcd_sendSetupData(hcdPtr);
 		ret = state_handled;
 		break;
 	case hcd_event_asyncComplete:
@@ -1165,6 +1226,12 @@ static SM_return hcd_sm_getDeviceDescriptorFull(hcd_params *pvParameters, void *
 	case hcd_event_disconnected:
 		nextState((void*)pvParameters, (void*)hcd_sm_disconnected);
 		ret = state_transition;
+		break;
+	case hcd_timer_tick:
+		hcd_changeAddress(1);
+		hcd_createGetDeviceDescriptor(hcdPtr);
+		hcd_sendSetupData(hcdPtr);
+		ret = state_handled;
 		break;
 	case hcd_event_exit:
 		ret = state_handled;
@@ -1184,8 +1251,8 @@ static SM_return hcd_sm_setAddress(hcd_params *pvParameters, void * event) {
 	hcd_t * hcdPtr = pvParameters->hcdPtr;
 	switch (*e) {
 	case hcd_event_enter:
-		hcd_createSetAddress(hcdPtr,1);
-		hcd_sendSetupData(hcdPtr);
+//		hcd_createSetAddress(hcdPtr,1);
+//		hcd_sendSetupData(hcdPtr);
 		ret = state_handled;
 		break;
 	case hcd_event_asyncComplete:
@@ -1195,6 +1262,11 @@ static SM_return hcd_sm_setAddress(hcd_params *pvParameters, void * event) {
 	case hcd_event_disconnected:
 		nextState((void*)pvParameters, (void*)hcd_sm_disconnected);
 		ret = state_transition;
+		break;
+	case hcd_timer_tick:
+		hcd_createSetAddress(hcdPtr,1);
+		hcd_sendSetupData(hcdPtr);
+		ret = state_handled;
 		break;
 	case hcd_event_exit:
 		ret = state_handled;
@@ -1214,7 +1286,7 @@ static SM_return hcd_sm_reset(hcd_params *pvParameters, void * event) {
 	hcd_t * hcdPtr = pvParameters->hcdPtr;
 	switch (*e) {
 	case hcd_event_enter:
-		hcd_resetPort(hcdPtr);
+//		hcd_resetPort(hcdPtr);
 		ret = state_handled;
 		break;
 	case hcd_event_powered:
@@ -1224,6 +1296,10 @@ static SM_return hcd_sm_reset(hcd_params *pvParameters, void * event) {
 	case hcd_event_disconnected:
 		nextState((void*)pvParameters, (void*)hcd_sm_disconnected);
 		ret = state_transition;
+		break;
+	case hcd_timer_tick:
+		hcd_resetPort(hcdPtr);
+		ret = state_handled;
 		break;
 	case hcd_event_exit:
 		ret = state_handled;
@@ -1243,8 +1319,8 @@ static SM_return hcd_sm_getDeviceDescriptor(hcd_params *pvParameters, void * eve
 	hcd_t * hcdPtr = pvParameters->hcdPtr;
 	switch (*e) {
 	case hcd_event_enter:
-		hcd_createGetDeviceDescriptor(hcdPtr);
-		hcd_sendSetupData(hcdPtr);
+//		hcd_createGetDeviceDescriptor(hcdPtr);
+//		hcd_sendSetupData(hcdPtr);
 		ret = state_handled;
 		break;
 	case hcd_event_asyncComplete:
@@ -1348,7 +1424,7 @@ SM_return hcd_init(hcd_params *pvParameters, void * event) {
 		hcd_start(pvParameters, &XScuGicInstance);// Start interrupts and handles the enumeration of devices registers interrupt handler
 
 		pvParameters->timerCallbackFunc = vTimerCallback;
-		pvParameters->timerhandle = xTimerCreate("HCD_Timer", 5, pdTRUE,
+		pvParameters->timerhandle = xTimerCreate("HCD_Timer", 10, pdTRUE,
 				pvParameters, pvParameters->timerCallbackFunc);
 		xTimerStart(pvParameters->timerhandle, 0);
 

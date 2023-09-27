@@ -6,8 +6,13 @@
 
 static UINTPTR memptr;
 unsigned int videoMem[DVI_HORIZONTAL][DVI_VERTICAL];
+static uint16_t x_translate;
+static uint16_t y_translate;
 
 
+void Display_flushMem(void){
+	Xil_DCacheFlushRange(memptr, DVI_TOTALMEM);
+}
 
 void flushMem(void) {
 	Xil_DCacheFlushRange(memptr, DVI_TOTALMEM);
@@ -123,3 +128,45 @@ void Display_sendPA_interleaved(uint32_t const *pa, uint16_t y, uint16_t h) {
 	}
 
 }
+
+void Display_updateXYaxis(int16_t x, int16_t y){
+
+
+	x_translate = x + DVI_HORIZONTAL_CENTER;
+	y_translate = -(y - DVI_VERTICAL_CENTER);
+}
+
+static void translateXY(int16_t *x, int16_t *y){
+	*x += x_translate; //DVI_HORIZONTAL_CENTER;
+	*y = -((*y)- y_translate);
+}
+
+void Display_drawLine(int16_t x0, int16_t y0, int16_t x1, int16_t y1){
+
+	int16_t x0_= x0;
+	int16_t y0_= y0;
+	translateXY(&x0_,&y0_);
+
+	int16_t x1_= x1;
+	int16_t y1_= y1;
+	translateXY(&x1_,&y1_);
+
+
+	drawLine(x0_,y0_,x1_,y1_);
+
+}
+
+
+void Display_fillCircle(int16_t x0, int16_t y0, int16_t radius){
+
+	int16_t x= x0;
+	int16_t y= y0;
+	translateXY(&x,&y);
+
+	GFX_fillCircle(x,y,radius);
+}
+
+void Display_changePenColor(uint8_t color){
+	GFX_changePenColor(color);
+}
+

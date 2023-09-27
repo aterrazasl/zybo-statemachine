@@ -14,7 +14,8 @@ typedef enum{
 	event_enter,
 	event_exit,
 	// base events handled by the state machine
-	event_timer_tick
+	event_timer_tick = 10,
+	disp_timer_tick = 20,
 }events;
 
 typedef enum {
@@ -27,6 +28,8 @@ typedef struct {
 	SM_return (*nextStateFun_ptr)(void*,void*);
 	SM_return (*init_ptr)(void*,void*);
 } SM_params;
+
+
 
 void nextState(SM_params *pvParameters, void* sm_state);
 void SM_dispatcher(void* params);

@@ -16,7 +16,16 @@ void hid_printLine(u8* data, u32 size, char* comment){
 	xil_printf(" // %s\r", comment);
 }
 
-static u8 evaluateDiff(u8* new){
+static u8 evaluateDiff(hcd_t* hcdPtr, u8* new){
+	int i;
+	for(i =0;i<8;i++){
+		if(hcdPtr->HIDdata[i]!= new[i]){
+			return 1;
+		}
+	}
+	return 0;
+}
+static u8 evaluateDiff_old(u8* new){
 	int i;
 	for(i =0;i<8;i++){
 		if(hid_data[i]!= new[i]){
@@ -32,9 +41,9 @@ char* readHID_Data(void){
 
 void hid_callbackHandler(void *CallBackRef, u32 Mask){
 	hcd_t *hcdPtr = (hcd_t*)CallBackRef;
-	if(evaluateDiff(((u8*)(hcdPtr->periodicqTD[1]->buffer[0]&0xfffff000)))){
-		hid_printLine((u8*)(hcdPtr->periodicqTD[1]->buffer[0]&0xfffff000), 0x0008, "Keyboard Report");
-		memcpy((void*)hid_data, (void*)(hcdPtr->periodicqTD[1]->buffer[0]&0xfffff000) , 8);
+	if(evaluateDiff(hcdPtr,((u8*)(hcdPtr->periodicqTD[1]->buffer[0]&0xfffff000)))){
+//		hid_printLine((u8*)(hcdPtr->periodicqTD[1]->buffer[0]&0xfffff000), 0x0008, "Keyboard Report");
+		memcpy((void*)hcdPtr->HIDdata, (void*)(hcdPtr->periodicqTD[1]->buffer[0]&0xfffff000) , 8);
 	}
 }
 

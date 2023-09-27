@@ -5,13 +5,20 @@
 
 #define DVI_HORIZONTAL 640
 #define DVI_VERTICAL 480
+
+#define DVI_HORIZONTAL_CENTER DVI_HORIZONTAL/2
+#define DVI_VERTICAL_CENTER   DVI_VERTICAL/2
+
 #define DVI_BYTES_PER_LINE 3
 #define DVI_TOTALMEM DVI_HORIZONTAL * DVI_VERTICAL * DVI_BYTES_PER_LINE
 
 int DVI_initDVI(void);
 void Display_sendPA(uint32_t const *pa, uint16_t y, uint16_t h);
 void Display_sendPA_interleaved(uint32_t const *pa, uint16_t y, uint16_t h);
-
-void flushMem(void);
+void Display_fillCircle(int16_t x0, int16_t y0, int16_t radius);
+void Display_drawLine(int16_t x0, int16_t y0, int16_t x1, int16_t y1);
+void Display_changePenColor(uint8_t color);
+void Display_flushMem(void);
+void Display_updateXYaxis(int16_t x, int16_t y);
 
 #endif

@@ -54,6 +54,9 @@ int setPixel(int16_t x, int16_t y) {
 		Xil_Out8(buffer + (x*3 + y *  DisplayWidth * 3 + 1) ,fontColor);
 		Xil_Out8(buffer + (x*3 + y *  DisplayWidth * 3 + 2) ,fontColor);
 
+//		u32 tmpColor = fontColor==0?0:0xffffffff;
+//		Xil_Out32(buffer + (x*3 + y *  DisplayWidth * 3 + 0) ,tmpColor);
+
 	}
 	return 0;
 }

@@ -143,6 +143,7 @@ typedef struct{
 
 	hcd_endpoint0 *ep0;
 	hcd_endpoint0 *ep1;
+	char* HIDdata;
 }hcd_t;
 
 
@@ -264,26 +265,31 @@ typedef enum{
 	hcd_event_enter,
 	hcd_event_exit,
 	// base events handled by the state machine
-	hcd_timer_tick,
+	hcd_timer_tick = 100,
 	hcd_event_asyncComplete,
 	hcd_event_periodComplete,
 	hcd_event_disconnected,
-	hcd_event_attached 	,
-	hcd_event_powered		,
-	hcd_event_getDeviceDescriptor,
-	hcd_event_reset		,
-	hcd_event_setAddress,
-	hcd_event_getDeviceDescriptorFull,
-	hcd_event_default		,
-	hcd_event_getStatus	,
-	hcd_event_getConfiguration,
-	hcd_event_getConfigurationFull,
-	hcd_event_address		,
-	hcd_event_configured	,
-	hcd_event_idle		,
-	hcd_event_suspended
+	hcd_event_powered,
+
+	hid_up =110,
+	hid_down,
+	hid_left,
+	hid_right,
+	hid_select,
+	hid_start,
+	hid_b,
+	hid_a
 }hcd_events;
 
+
+#define HID_UP_MASK 	0x00
+#define HID_DOWN_MASK 	0xFF
+#define HID_LEFT_MASK 	0x00
+#define HID_RIGHT_MASK 	0xFF
+#define HID_A_MASK 		0x2F
+#define HID_B_MASK 		0x4F
+#define HID_SELECT_MASK	0x10
+#define HID_START_MASK 	0x20
 
 SM_return hcd_init(hcd_params *pvParameters,void * event);
 
