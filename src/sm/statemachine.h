@@ -9,6 +9,8 @@
 #include "timers.h"
 
 
+#define MAX_NUMBER_OF_SM 4
+
 typedef enum{
 	event_init,
 	event_enter,
@@ -30,8 +32,8 @@ typedef struct {
 } SM_params;
 
 
-
-void nextState(SM_params *pvParameters, void* sm_state);
+void SM_broadcastSignal(void* sm_event);
+void SM_nextState(SM_params *pvParameters, void* sm_state);
 void SM_dispatcher(void* params);
 
 #endif

@@ -24,13 +24,6 @@ extern int pool_count;
 
 int main(void) {
 
-	signal_pool[0] = (SM_params*)(&blinky1);
-	signal_pool[1] = (SM_params*)(&blinky2);
-	signal_pool[2] = (SM_params*)(&hcd);
-	signal_pool[3] = (SM_params*)(&disp);
-	//pool_count = 4;
-
-
 	blinky1.statemachine.init_ptr = Blinky1_init;
 	xTaskCreate(SM_dispatcher, (const char *) "Blinky1",
 	configMINIMAL_STACK_SIZE, &blinky1, tskIDLE_PRIORITY,

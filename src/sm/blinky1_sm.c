@@ -24,7 +24,7 @@ static SM_return Blinky1_on(blinky1_params *pvParameters,void * event) {
 		ret = state_handled;
 		break;
 	case event_timer_tick:
-		nextState((void*)pvParameters, (void*)Blinky1_off);
+		SM_nextState((void*)pvParameters, (void*)Blinky1_off);
 		ret = state_transition;
 		break;
 	case event_exit:
@@ -48,7 +48,7 @@ static SM_return Blinky1_off(blinky1_params *pvParameters,void * event) {
 		ret = state_handled;
 		break;
 	case event_timer_tick:
-		nextState((void*)pvParameters, (void*)Blinky1_on);
+		SM_nextState((void*)pvParameters, (void*)Blinky1_on);
 		ret = state_transition;
 		break;
 	case event_exit:
@@ -70,7 +70,7 @@ SM_return Blinky1_init(blinky1_params *pvParameters,void * event) {
 
 		pvParameters->timerhandle = xTimerCreate("SM_Timer", 100, pdFALSE, pvParameters,
 				pvParameters->timerCallbackFunc);
-		nextState((void*)pvParameters, (void*)Blinky1_on);
+		SM_nextState((void*)pvParameters, (void*)Blinky1_on);
 
 		ret = state_transition;
 		break;
@@ -89,7 +89,7 @@ SM_return Blinky1_init_old(blinky1_params *pvParameters,void * event) {
 
 	pvParameters->timerhandle = xTimerCreate("SM_Timer", 100, pdFALSE, pvParameters,
 			pvParameters->timerCallbackFunc);
-	nextState((void*)pvParameters, (void*)Blinky1_on);
+	SM_nextState((void*)pvParameters, (void*)Blinky1_on);
 
 	return state_transition;
 }
