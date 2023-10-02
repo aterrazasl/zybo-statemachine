@@ -18,19 +18,56 @@ void flushMem(void) {
 	Xil_DCacheFlushRange(memptr, DVI_TOTALMEM);
 }
 
+static int mapColor(int color){
+	int ret=0x00000000;
+	switch(color){
+	case CBlack:
+		ret = 0x00000000;
+		break;
+	case CWhite:
+		ret = 0x00ffffff;
+		break;
+	case CBlue:
+		ret = 0x000000ff;
+		break;
+	case CGreen:
+		ret = 0x0000ff00;
+		break;
+	case CRed:
+		ret = 0x00ff0000;
+		break;
+	case CGray:
+		ret = 0x007f7f7f;
+		break;
+	default:
+		break;
+	}
+
+	return ret;
+}
+void Display_fillRect(int16_t x, int16_t y, int16_t width,int16_t height, int color){
+	GFX_changePenColor(mapColor(color));
+	GFX_fillRect(x, y, width,height);
+}
+
+void Display_drawRect(int16_t x, int16_t y, int16_t width,int16_t height, int color){
+	GFX_changePenColor(mapColor(color));
+	GFX_drawRect(x, y, width,height);
+}
+
 void DVI_drawOutline(void) {
 
-	GFX_changePenColor(0x00);	// change color to Black
+	GFX_changePenColor(mapColor(CBlack));	// change color to Black
 	GFX_fillRect(0, 0, DVI_HORIZONTAL, DVI_VERTICAL);
 
-	GFX_changePenColor(0xff);
+	GFX_changePenColor(mapColor(CWhite));
 	drawLine(0, 0, 0, DVI_VERTICAL - 1);
 	drawLine(DVI_HORIZONTAL - 1, 0, DVI_HORIZONTAL - 1, DVI_VERTICAL - 1);
 
 	drawLine(0, 0, DVI_HORIZONTAL - 1, 0);
 	drawLine(0, DVI_VERTICAL - 1, DVI_HORIZONTAL - 1, DVI_VERTICAL - 1);
 
-	GFX_changePenColor(0xff);	//change color to White
+	GFX_changePenColor(mapColor(CWhite));	//change color to White
 
 	Xil_DCacheFlushRange(memptr, DVI_TOTALMEM);
 

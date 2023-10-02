@@ -12,6 +12,11 @@
 #define DVI_BYTES_PER_LINE 3
 #define DVI_TOTALMEM DVI_HORIZONTAL * DVI_VERTICAL * DVI_BYTES_PER_LINE
 
+enum{
+	CBlack,CWhite,CRed,CGreen,CBlue,CGray
+};
+
+
 int DVI_initDVI(void);
 void Display_sendPA(uint32_t const *pa, uint16_t y, uint16_t h);
 void Display_sendPA_interleaved(uint32_t const *pa, uint16_t y, uint16_t h);
@@ -20,5 +25,7 @@ void Display_drawLine(int16_t x0, int16_t y0, int16_t x1, int16_t y1);
 void Display_changePenColor(uint8_t color);
 void Display_flushMem(void);
 void Display_updateXYaxis(int16_t x, int16_t y);
+void Display_drawRect(int16_t x, int16_t y, int16_t width,int16_t height, int color);
+void Display_fillRect(int16_t x, int16_t y, int16_t width,int16_t height, int color);
 
 #endif

@@ -65,7 +65,7 @@ extern int drawLine(int16_t x0, int16_t y0, int16_t x1, int16_t y1);
 extern int drawCircle(int16_t x0, int16_t y0, int16_t radius);
 extern int GFX_fillCircle(int16_t x0, int16_t y0, int16_t radius);
 extern int GFX_fillRect(int16_t xMove, int16_t yMove, int16_t width, int16_t height);
-extern int GFX_changePenColor(uint8_t iliColor);
+extern int GFX_changePenColor(uint32_t iliColor);
 extern int GFX_drawString(int16_t xMove, int16_t yMove, char* text);
 extern int GFX_pattern();
 extern int drawStringBuffer(char * text, char * draw, int rowSize, int colSize);
@@ -73,6 +73,7 @@ extern void GFX_printText(char * text);
 extern void GFX_printText_rc(char * text, int row, int col);
 extern void GFX_update_textBuffer();
 extern int setPixelColor(int16_t x, int16_t y,uint8_t color) ;
+extern int GFX_drawRect(int16_t x, int16_t y, int16_t width, int16_t height);
 #endif /* GFX_H_ */
 
 

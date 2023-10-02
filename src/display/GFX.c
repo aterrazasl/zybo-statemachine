@@ -16,7 +16,7 @@
 uint16_t DisplayWidth;
 uint16_t DisplayHeight;
 
-uint8_t fontColor = 0xff;// ILI9341_WHITE;
+uint32_t fontColor = 0x00ffffff;
 uint16_t fontBackground = 0x0000;//ILI9341_BLACK;
 static UINTPTR buffer; // this is the buffer used for map the display data
 static char textBuffer[BUFFERSIZE]; // this is the buffer to track the text
@@ -28,7 +28,7 @@ const char *fontData = DejaVu_LGC_Sans_Mono_10;
 OLEDDISPLAY_TEXT_ALIGNMENT   textAlignment = TEXT_ALIGN_LEFT;
 
 /* Changes the font color for next GFX action */
-int GFX_changePenColor(uint8_t iliColor)
+int GFX_changePenColor(uint32_t iliColor)
 {
 	fontColor = iliColor;
 	return 0;
@@ -50,9 +50,9 @@ int setPixel(int16_t x, int16_t y) {
 	if (x >= 0 && x <   DisplayWidth && y >= 0 && y <  DisplayHeight) {
 //		buffer[ (x + y *  DisplayWidth)] |=  fontColor;
 
-		Xil_Out8(buffer + (x*3 + y *  DisplayWidth * 3 + 0) ,fontColor);
-		Xil_Out8(buffer + (x*3 + y *  DisplayWidth * 3 + 1) ,fontColor);
-		Xil_Out8(buffer + (x*3 + y *  DisplayWidth * 3 + 2) ,fontColor);
+		Xil_Out8(buffer + (x*3 + y *  DisplayWidth * 3 + 0) , (u8)(fontColor & 0xff));
+		Xil_Out8(buffer + (x*3 + y *  DisplayWidth * 3 + 1) ,(u8)((fontColor & 0xff00) >> 8));
+		Xil_Out8(buffer + (x*3 + y *  DisplayWidth * 3 + 2) ,(u8)((fontColor & 0xff0000)>>16));
 
 //		u32 tmpColor = fontColor==0?0:0xffffffff;
 //		Xil_Out32(buffer + (x*3 + y *  DisplayWidth * 3 + 0) ,tmpColor);
@@ -270,19 +270,19 @@ int drawVerticalLine(int16_t x, int16_t y, int16_t length) {
 	bufferPtr += x * 3;
 	do {
 //		*bufferPtr = fontColor;
-		Xil_Out8(bufferPtr++ , 0xff);
-		Xil_Out8(bufferPtr++ , 0xff);
-		Xil_Out8(bufferPtr++ , 0xff);
+		Xil_Out8(bufferPtr++ , (u8)((fontColor & 0xff)>>0));
+		Xil_Out8(bufferPtr++ , (u8)((fontColor & 0xff00)>>8));
+		Xil_Out8(bufferPtr++ , (u8)((fontColor & 0xff0000)>>16));
 
-		bufferPtr += DisplayWidth * 3;
+		bufferPtr += (DisplayWidth * 3)-3;
 		length -= 1;
 	} while (length > 0);
 
 	if (length > 0) {
 //		*bufferPtr =fontColor;
-		Xil_Out8(bufferPtr , 0xff);
-		Xil_Out8(bufferPtr , 0xff);
-		Xil_Out8(bufferPtr , 0xff);
+		Xil_Out8(bufferPtr++ , (u8)((fontColor & 0xff)>>0));
+		Xil_Out8(bufferPtr++ , (u8)((fontColor & 0xff00)>>8));
+		Xil_Out8(bufferPtr++ , (u8)((fontColor & 0xff0000)>>16));
 	}
 
 	return 0;
