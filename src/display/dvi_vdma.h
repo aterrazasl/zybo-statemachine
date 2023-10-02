@@ -13,7 +13,7 @@
 #define DVI_TOTALMEM DVI_HORIZONTAL * DVI_VERTICAL * DVI_BYTES_PER_LINE
 
 enum{
-	CBlack,CWhite,CRed,CGreen,CBlue,CGray
+	CBlack,CWhite,CRed,CGreen,CBlue,CGray,CYellow
 };
 
 

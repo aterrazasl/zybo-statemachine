@@ -39,6 +39,9 @@ static int mapColor(int color){
 	case CGray:
 		ret = 0x007f7f7f;
 		break;
+	case CYellow:
+		ret = 0x00ffff00;
+		break;
 	default:
 		break;
 	}
