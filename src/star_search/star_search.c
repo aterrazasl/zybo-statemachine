@@ -51,12 +51,23 @@ static float square(float a){
 	return a*a;
 }
 
-float calculateEuclidian(grid_t * cur, grid_t * dest){
+
+static float calculateEuclidian(grid_t * cur, grid_t * dest){
 	float ret = 0.0;
 	ret =  sqrtf( square(cur->spot.index.i - dest->spot.index.i) + square(cur->spot.index.j - dest->spot.index.j));
 	return ret;
 }
 
+static float calculateManhatan(grid_t * cur, grid_t * dest){
+	float ret = 0.0;
+	ret = abs(cur->spot.index.i - dest->spot.index.i) + abs(cur->spot.index.j - dest->spot.index.j);
+	return ret;
+}
+
+float calculateHeuristic(grid_t * cur, grid_t * dest){
+//	return calculateEuclidian(cur,dest);
+	return calculateManhatan(cur,dest);
+}
 
 static int isWall(grid_t * item){
 	return item->spot.wall;

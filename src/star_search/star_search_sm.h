@@ -104,7 +104,7 @@ void addItemToList(list_t * const l, grid_t *item);
 grid_t* getItemByIndex(list_t * const l, int index);
 int inList(list_t * l, grid_t * item);
 void clearList(list_t * l);
-float calculateEuclidian(grid_t * cur, grid_t * dest);
+float calculateHeuristic(grid_t * cur, grid_t * dest);
 
 
 #endif

@@ -157,7 +157,7 @@ static int calc_Astar(star_vars *sv) {
 			grid_t * neighbor = getItemByIndex(nl, n);
 
 			if (!inList(cl, neighbor)) {
-				float tempG = calculateEuclidian(current, neighbor);
+				float tempG = calculateHeuristic(current, neighbor);
 
 				if (inList(ol, neighbor)) {
 					if (tempG < neighbor->cost.g) {
@@ -165,7 +165,7 @@ static int calc_Astar(star_vars *sv) {
 					}
 				} else {
 					neighbor->cost.g = tempG;
-					neighbor->cost.h = calculateEuclidian(neighbor,	destination);
+					neighbor->cost.h = calculateHeuristic(neighbor,	destination);
 					neighbor->cost.f = neighbor->cost.g	+ neighbor->cost.h;
 					neighbor->prev = (grid_t*) current;
 					addItemToList(ol, neighbor);
@@ -324,7 +324,7 @@ static void initGame(star_vars *sv){
 
 	start = &(*sv->gd)[i][j];//[GRID_WIDTH-1][GRID_HEIGHT-1];
 	start->cost = (cost_t){0.0,0.0,0.0};
-	start->cost.f = 0;calculateEuclidian(start, destination);
+	start->cost.f = 0;calculateHeuristic(start, destination);
 	start->spot.wall=0;
 	addItemToList(sv->ol, start);
 
