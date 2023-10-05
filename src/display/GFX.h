@@ -74,6 +74,7 @@ extern void GFX_printText_rc(char * text, int row, int col);
 extern void GFX_update_textBuffer();
 extern int setPixelColor(int16_t x, int16_t y,uint8_t color) ;
 extern int GFX_drawRect(int16_t x, int16_t y, int16_t width, int16_t height);
+extern int setPixel(int16_t x, int16_t y);
 #endif /* GFX_H_ */
 
 

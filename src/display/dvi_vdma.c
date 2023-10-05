@@ -10,6 +10,11 @@ static uint16_t x_translate;
 static uint16_t y_translate;
 
 
+static void translateXY(int16_t *x, int16_t *y){
+	*x += x_translate; //DVI_HORIZONTAL_CENTER;
+	*y = -((*y)- y_translate);
+}
+
 void Display_flushMem(void){
 	Xil_DCacheFlushRange(memptr, DVI_TOTALMEM);
 }
@@ -57,6 +62,16 @@ void Display_drawRect(int16_t x, int16_t y, int16_t width,int16_t height, int co
 	GFX_changePenColor(mapColor(color));
 	GFX_drawRect(x, y, width,height);
 }
+
+void Display_drawRectCenter(int16_t x, int16_t y, int16_t width,int16_t height, int color){
+	int16_t x0= x;
+	int16_t y0= y;
+	translateXY(&x0,&y0);
+
+	GFX_changePenColor(mapColor(color));
+	GFX_drawRect(x0-(width), y0-(height), (width*2),(height*2));
+}
+
 
 void DVI_drawOutline(void) {
 
@@ -176,11 +191,6 @@ void Display_updateXYaxis(int16_t x, int16_t y){
 	y_translate = -(y - DVI_VERTICAL_CENTER);
 }
 
-static void translateXY(int16_t *x, int16_t *y){
-	*x += x_translate; //DVI_HORIZONTAL_CENTER;
-	*y = -((*y)- y_translate);
-}
-
 void Display_drawLine(int16_t x0, int16_t y0, int16_t x1, int16_t y1){
 
 	int16_t x0_= x0;
@@ -202,11 +212,21 @@ void Display_fillCircle(int16_t x0, int16_t y0, int16_t radius){
 	int16_t x= x0;
 	int16_t y= y0;
 	translateXY(&x,&y);
-
 	GFX_fillCircle(x,y,radius);
+
+}
+
+void Display_setPixel(int16_t x0, int16_t y0){
+
+	int16_t x= x0;
+	int16_t y= y0;
+	translateXY(&x,&y);
+	setPixel(x,y);
+
 }
 
 void Display_changePenColor(uint8_t color){
-	GFX_changePenColor(color);
+	GFX_changePenColor(mapColor(color));
+//	GFX_changePenColor(color);
 }
 
