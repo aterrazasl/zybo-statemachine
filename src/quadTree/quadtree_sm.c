@@ -4,8 +4,9 @@
 #include <stdlib.h>
 #include "../hcd/hcd.h"
 
-#define NUM_POINTS 500
-static point_t newPoint[640*480];
+
+static point_t newPoint[NUM_POINTS];
+
 
 list_t * foundPoints= NULL;
 boundary_t test={{0,0},100,100};
@@ -180,6 +181,7 @@ SM_return quadtree_init(quadtree_params *pvParameters,void * event) {
 				pvParameters->timerCallbackFunc);
 
 	case event_enter:
+
 		srand(xTaskGetTickCount());
 		boundary_t b = {{0,0},DVI_HORIZONTAL_CENTER,DVI_VERTICAL_CENTER};
 

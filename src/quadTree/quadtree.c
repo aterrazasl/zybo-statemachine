@@ -3,7 +3,7 @@
 
 //Garbage collector, keeps track of the QT created in order to dealloc when needed
 //TODO: change later to recursively dealloc the subdivisions
-quadtree_t *gc[640*480];
+quadtree_t *gc[NUM_POINTS];
 int gc_count = 0;
 
 static void addToGC(quadtree_t *qt){
@@ -136,26 +136,30 @@ void quadtree_destroy(void){
 	for(int i = 0; i < temp_gc_count; i++){
 
 		temp = gc[i];
-		if(temp->nw){
-			free(temp->nw->points->list);
-			free(temp->nw->points);
-//			free(temp->nw);
-
-			free(temp->ne->points->list);
-			free(temp->ne->points);
-//			free(temp->ne);
-
-			free(temp->sw->points->list);
-			free(temp->sw->points);
-//			free(temp->sw);
-
-			free(temp->se->points->list);
-			free(temp->se->points);
-//			free(temp->se);
-
+		if (temp->points) {
+			free(temp->points->list);
+			free(temp->points);
 		}
-			free(temp);
-			gc_count--;
+//		if(temp->nw){
+//			free(temp->nw->points->list);
+//			free(temp->nw->points);
+////			free(temp->nw);
+//
+//			free(temp->ne->points->list);
+//			free(temp->ne->points);
+////			free(temp->ne);
+//
+//			free(temp->sw->points->list);
+//			free(temp->sw->points);
+////			free(temp->sw);
+//
+//			free(temp->se->points->list);
+//			free(temp->se->points);
+////			free(temp->se);
+//
+//		}
+		free(temp);
+		gc_count--;
 
 	}
 //	xil_printf("mem Address qt= 0x%08X, gc_count=%d\r",(uint32_t)gc[0],gc_count);
@@ -212,7 +216,7 @@ list_t * quadtree_queryRange(quadtree_t* me, list_t * pointsInRange, boundary_t 
 
 	list_t * retpointsInRange = NULL;
 	if(pointsInRange == NULL){
-		retpointsInRange = createList(640*480);
+		retpointsInRange = createList(NUM_POINTS);
 	}
 	else{
 		retpointsInRange = pointsInRange;

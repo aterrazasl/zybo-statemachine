@@ -4,7 +4,7 @@
 #include "../sm/statemachine.h"
 
 #define QT_NODE_CAPACITY 4
-
+#define NUM_POINTS 500
 
 typedef struct{
 	int16_t x;
